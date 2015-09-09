@@ -3,12 +3,13 @@ package ouidb
 
 import (
 	"bufio"
-	"bytes"
+	"encoding/hex"
 	"errors"
 	"net"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // https://code.wireshark.org/review/gitweb?p=wireshark.git;a=blob_plain;f=manuf
@@ -17,80 +18,19 @@ const big = 0xFFFFFF
 
 var ErrInvalidMACAddress = errors.New("invalid MAC address")
 
-// Hexadecimal to integer starting at &s[i0].
-// Returns number, new offset, success.
-func xtoi(s string, i0 int) (n int, i int, ok bool) {
-	n = 0
-	for i = i0; i < len(s); i++ {
-		if '0' <= s[i] && s[i] <= '9' {
-			n *= 16
-			n += int(s[i] - '0')
-		} else if 'a' <= s[i] && s[i] <= 'f' {
-			n *= 16
-			n += int(s[i]-'a') + 10
-		} else if 'A' <= s[i] && s[i] <= 'F' {
-			n *= 16
-			n += int(s[i]-'A') + 10
-		} else {
-			break
-		}
-		if n >= big {
-			return 0, i, false
-		}
-	}
-	if i == i0 {
-		return 0, i, false
-	}
-	return n, i, true
-}
-
-// xtoi2 converts the next two hex digits of s into a byte.
-// If s is longer than 2 bytes then the third byte must be e.
-// If the first two bytes of s are not hex digits or the third byte
-// does not match e, false is returned.
-func xtoi2(s string, e byte) (byte, bool) {
-	if len(s) > 2 && s[2] != e {
-		return 0, false
-	}
-	n, ei, ok := xtoi(s[:2], 0)
-	return byte(n), ok && ei == 2
-}
-
-const hexDigit = "0123456789abcdef"
-
 type HardwareAddr net.HardwareAddr
 
-// ParseMAC parses s as an IEEE 802 MAC-48, EUI-48, or EUI-64 using one of the
-// following formats:
-//   01:23:45:67:89:ab
-//   01:23:45:67:89:ab:cd:ef
-//   01-23-45-67-89-ab
-//   01-23-45-67-89-ab-cd-ef
-//   0123.4567.89ab
-//   0123.4567.89ab.cdef
-func ParseOUI(s string, size int) (hw HardwareAddr, err error) {
-	if s[2] == ':' || s[2] == '-' {
-		if (len(s)+1)%3 != 0 {
-			goto error
-		}
+func parseMAC(s string) ([6]byte, error) {
+	var hw [6]byte
 
-		n := (len(s) + 1) / 3
+	oct := strings.FieldsFunc(s, func(r rune) bool { return r == ':' || r == '-' })
 
-		hw = make(HardwareAddr, size)
-		for x, i := 0, 0; i < n; i++ {
-			var ok bool
-			if hw[i], ok = xtoi2(s[x:], s[2]); !ok {
-				goto error
-			}
-			x += 3
-		}
-	} else {
-		goto error
+	_, err := hex.Decode(hw[:], []byte(strings.Join(oct, "")))
+	if err != nil {
+		return hw, err
 	}
-	return hw, nil
 
-error:
-	return nil, ErrInvalidMACAddress
+	return hw, nil
 }
 
 // Mask returns the result of masking the address with mask.
@@ -115,7 +55,6 @@ type OuiDb struct {
 	hw   [6]byte
 	mask int
 
-	dict   [][]byte
 	Blocks []AddressBlock
 
 	t map[int]t2
@@ -131,9 +70,13 @@ func New(file string) *OuiDb {
 }
 
 // Lookup finds the OUI the address belongs to
-func (m *OuiDb) Lookup(address HardwareAddr) *AddressBlock {
+func (m *OuiDb) lookup(address [6]byte) *AddressBlock {
+	a := macToUint64(address)
 	for _, block := range m.Blocks {
-		if block.Contains(address) {
+		o := macToUint64(block.Oui)
+		m := maskToUint64(block.Mask)
+
+		if a &m == o {
 			return &block
 		}
 	}
@@ -143,11 +86,11 @@ func (m *OuiDb) Lookup(address HardwareAddr) *AddressBlock {
 
 // VendorLookup obtains the vendor organization name from the MAC address s.
 func (m *OuiDb) VendorLookup(s string) (string, error) {
-	addr, err := net.ParseMAC(s)
+	addr, err := parseMAC(s)
 	if err != nil {
 		return "", err
 	}
-	block := m.Lookup(HardwareAddr(addr))
+	block := m.lookup(addr)
 	if block == nil {
 		return "", ErrInvalidMACAddress
 	}
@@ -199,14 +142,18 @@ func (m *OuiDb) Load(path string) error {
 
 		s := matches[0][1]
 
-		i := byteIndex(s, '/')
-
-		if i == -1 {
-			block.Oui, err = ParseOUI(s, 6)
+		if i := byteIndex(s, '/'); i < 0 {
+			block.Oui, err = parseMAC(s)
 			block.Mask = 24 // len(block.Oui) * 8
 		} else {
-			block.Oui, err = ParseOUI(s[:i], 6)
-			block.Mask, err = strconv.Atoi(s[i+1:])
+			var mask int
+			block.Oui, err = parseMAC(s[:i])
+			mask, err = strconv.Atoi(s[i+1:])
+			block.Mask = uint8(mask)
+		}
+
+		if err != nil {
+			continue
 		}
 
 		//fmt.Println("OUI:", block.Oui, block.Mask, err)
@@ -223,10 +170,10 @@ func (m *OuiDb) Load(path string) error {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return (err)
+		return err
 	}
 
-	return (nil)
+	return nil
 }
 
 func CIDRMask(ones, bits int) []byte {
@@ -249,14 +196,21 @@ func CIDRMask(ones, bits int) []byte {
 
 // oui, mask, organization
 type AddressBlock struct {
-	Oui          HardwareAddr
-	Mask         int
+	Oui          [6]uint8
+	Mask         uint8
 	Organization string
 }
 
-// Contains reports whether the mac address belongs to the OUI
-func (b *AddressBlock) Contains(address HardwareAddr) bool {
-	//fmt.Println("%v %v %v %v", b.Oui, len(b.Oui), address.Mask(CIDRMask(b.Mask, len(b.Oui)*8)), CIDRMask(b.Mask, len(b.Oui)*8))
-
-	return (bytes.Equal(address.Mask(CIDRMask(b.Mask, len(b.Oui)*8)), b.Oui))
+func macToUint64(address [6]byte) uint64 {
+	var a uint64
+	for _, x := range address {
+		a <<= 8
+		a |= uint64(x)
+	}
+	return a
 }
+
+func maskToUint64(mask uint8) uint64 {
+	return ^(uint64(1)<<(48-mask) - 1)
+}
+
