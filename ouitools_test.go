@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-var db *OuiDb
+var db *OuiDB
 
 func lookup(t *testing.T, mac, org string) {
 	if db == nil {
 		t.Fatal("database not initialized")
 	}
-	v, err := db.VendorLookup(mac)
+	v, err := db.Lookup(mac)
 	if err != nil {
 		t.Fatalf("parse: %s: %s", mac, err.Error())
 	}
