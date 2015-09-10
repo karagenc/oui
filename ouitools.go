@@ -13,7 +13,6 @@ import (
 
 var ErrInvalidMACAddress = errors.New("invalid MAC address")
 
-
 // Helper functions
 
 func macToUint64(address [6]byte) uint64 {
@@ -32,17 +31,25 @@ func maskToUint64(mask uint8) uint64 {
 func parseMAC(s string) ([6]byte, error) {
 	var hw [6]byte
 
-	oct := strings.FieldsFunc(s,
-		func(r rune) bool { return r == ':' || r == '-' })
+	var oct []string
+	if strings.IndexByte(s, ':') > 0 {
+		oct = strings.Split(s, ":")
+	} else {
+		oct = strings.Split(s, "-")
+	}
 
-	_, err := hex.Decode(hw[:], []byte(strings.Join(oct, "")))
-	if err != nil {
-		return hw, err
+	for i, o := range oct {
+		if len(o)&1 != 0 {
+			o = "0" + o
+		}
+		_, err := hex.Decode(hw[i:i+1], []byte(o))
+		if err != nil {
+			return hw, err
+		}
 	}
 
 	return hw, nil
 }
-
 
 // oui, mask, organization
 type addressBlock struct {
@@ -89,15 +96,15 @@ func (m *OuiDB) load(path string) error {
 			continue
 		}
 
-		s := matches[0][1]
+		//s := matches[0][1]
 
-		if i := strings.IndexByte(s, '/'); i < 0 {
-			block.Oui, err = parseMAC(s)
+		if i := strings.IndexByte(addr, '/'); i < 0 {
+			block.Oui, err = parseMAC(addr)
 			block.Mask = 24 // len(block.Oui) * 8
 		} else {
 			var mask int
-			block.Oui, err = parseMAC(s[:i])
-			mask, err = strconv.Atoi(s[i+1:])
+			block.Oui, err = parseMAC(addr[:i])
+			mask, err = strconv.Atoi(addr[i+1:])
 			block.Mask = uint8(mask)
 		}
 
@@ -106,14 +113,6 @@ func (m *OuiDB) load(path string) error {
 		}
 
 		m.blocks = append(m.blocks, block)
-
-		// create smart map
-		for i := len(block.Oui) - 1; i >= 0; i-- {
-			_ = block.Oui[i]
-
-		}
-
-		// fmt.Printf("BLA %v %v ALB", m.hw, m.mask)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -154,8 +153,7 @@ func (m *OuiDB) Lookup(s string) (string, error) {
 	}
 	block := m.blockLookup(addr)
 	if block == nil {
-		return "", ErrInvalidMACAddress
+		return "<unknown>", nil
 	}
 	return block.Organization, nil
 }
-

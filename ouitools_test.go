@@ -21,6 +21,16 @@ func lookup(t *testing.T, mac, org string) {
 	t.Logf("%s => %s\n", mac, v)
 }
 
+func invalid(t *testing.T, mac string) {
+	if db == nil {
+		t.Fatal("database not initialized")
+	}
+	v, err := db.Lookup(mac)
+	if err == nil {
+		t.Fatalf("didn't fail on invalid %s, got %s", mac, v)
+	}
+}
+
 func TestInitialization(t *testing.T) {
 	db = New("oui.txt")
 	if db == nil {
@@ -42,14 +52,26 @@ func TestInvalidDBFile(t *testing.T) {
 	}
 }
 
-func TestLookup1(t *testing.T) {
+func TestLookup24(t *testing.T) {
 	lookup(t, "60:03:08:a0:ec:a6", "Apple, Inc.")
 }
 
-func TestLookup2(t *testing.T) {
-	lookup(t, "00:25:9c:42:c2:62", "Cisco-Linksys, LLC")
+func TestLookup36(t *testing.T) {
+	lookup(t, "00:1B:C5:00:E1:55", "Vigor Electric Corp")
 }
 
-func TestLookup3(t *testing.T) {
-	lookup(t, "00:16:e0:3d:f4:4c", "3Com Ltd")
+func TestLookup32(t *testing.T) {
+	lookup(t, "AA-00-03-01-aa-00", "DEC-PROM-AA")
+}
+
+func TestFormatSingleZero(t *testing.T) {
+	lookup(t, "0:25:9c:42:0:62", "Cisco-Linksys, LLC")
+}
+
+func TestFormatUppercase(t *testing.T) {
+	lookup(t, "0:25:9C:42:C2:62", "Cisco-Linksys, LLC")
+}
+
+func TestInvalidMAC1(t *testing.T) {
+	invalid(t, "00:25-:9C:42:C2:62")
 }
