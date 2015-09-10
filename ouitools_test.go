@@ -60,8 +60,8 @@ func TestLookup36(t *testing.T) {
 	lookup(t, "00:1B:C5:00:E1:55", "Vigor Electric Corp")
 }
 
-func TestLookup32(t *testing.T) {
-	lookup(t, "AA-00-03-01-aa-00", "DEC-PROM-AA")
+func TestLookup40(t *testing.T) {
+	lookup(t, "20-52-45-43-56-aa", "Receive")
 }
 
 func TestFormatSingleZero(t *testing.T) {

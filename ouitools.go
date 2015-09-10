@@ -84,6 +84,11 @@ func (m *OuiDB) load(path string) error {
 		// Split input text into address, short organization name
 		// and full organization name
 		fields := fieldsRe.FindAllStringSubmatch(text, -1)
+
+		if fields[0][2] == "IeeeRegi" {
+			continue
+		}
+
 		addr := fields[0][1]
 		if fields[0][4] != "" {
 			block.Organization = fields[0][4]
