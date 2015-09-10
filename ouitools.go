@@ -3,7 +3,6 @@ package ouidb
 
 import (
 	"bufio"
-	"encoding/hex"
 	"errors"
 	"os"
 	"regexp"
@@ -32,34 +31,63 @@ func parseMAC(s string) ([6]byte, error) {
 	var hw [6]byte
 
 	var oct []string
-	if strings.IndexByte(s, ':') > 0 {
-		oct = strings.Split(s, ":")
-	} else {
+	if strings.IndexByte(s, ':') < 0 {
 		oct = strings.Split(s, "-")
+	} else {
+		oct = strings.Split(s, ":")
 	}
 
-	for i, o := range oct {
-		if len(o)&1 != 0 {
-			o = "0" + o
-		}
-		_, err := hex.Decode(hw[i:i+1], []byte(o))
+	/*oct := strings.FieldsFunc(s,
+		func(r rune) bool { return r == ':' || r == '-' })*/
+
+	for i,x := range(oct) {
+		h,err := strconv.ParseUint(x, 16, 8)
 		if err != nil {
 			return hw, err
 		}
+		hw[i] = uint8(h)
 	}
 
 	return hw, nil
 }
 
+type addressBlock interface {
+	Uint64OUI() uint64
+	Organization() string
+}
+
 // oui, mask, organization
-type addressBlock struct {
-	Oui          [6]byte
-	Mask         byte
-	Organization string
+type addressBlock24 struct {
+	oui          [3]byte
+	mask         byte
+	organization [8]byte
+}
+
+func (a *addressBlock24) Uint64OUI() uint64 {
+	return uint64(a.oui[0]) << 40 | uint64(a.oui[1]) << 32 | uint64(a.oui[2]) << 24
+}
+
+func (a *addressBlock24) Organization() string {
+	return strings.TrimSpace(string(a.organization[:]))
+}
+
+type addressBlock48 struct {
+	oui          [6]byte
+	mask         byte
+	organization [8]byte
+}
+
+func (a *addressBlock48) Uint64OUI() uint64 {
+	return macToUint64(a.oui)
+}
+
+func (a *addressBlock48) Organization() string {
+	return strings.TrimSpace(string(a.organization[:]))
 }
 
 type OuiDB struct {
-	blocks []addressBlock
+	blocks24 []addressBlock24
+	blocks48 []addressBlock48
 }
 
 func (m *OuiDB) load(path string) error {
@@ -70,8 +98,6 @@ func (m *OuiDB) load(path string) error {
 
 	fieldsRe := regexp.MustCompile(`^(\S+)\t+(\S+)(\s+#\s+(\S.*))?`)
 
-	re := regexp.MustCompile(`((?:(?:[0-9a-zA-Z]{2})[-:]){2,5}(?:[0-9a-zA-Z]{2}))(?:/(\w{1,2}))?`)
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		text := scanner.Text()
@@ -79,10 +105,7 @@ func (m *OuiDB) load(path string) error {
 			continue
 		}
 
-		block := addressBlock{}
-
-		// Split input text into address, short organization name
-		// and full organization name
+		// Split input text into address and organization name
 		fields := fieldsRe.FindAllStringSubmatch(text, -1)
 
 		if fields[0][2] == "IeeeRegi" {
@@ -90,34 +113,39 @@ func (m *OuiDB) load(path string) error {
 		}
 
 		addr := fields[0][1]
-		if fields[0][4] != "" {
-			block.Organization = fields[0][4]
-		} else {
-			block.Organization = fields[0][2]
-		}
+		org := fields[0][2] + "        "
 
-		matches := re.FindAllStringSubmatch(addr, -1)
-		if len(matches) == 0 {
-			continue
-		}
-
-		//s := matches[0][1]
+		var oui [6]byte
+		var mask int
 
 		if i := strings.IndexByte(addr, '/'); i < 0 {
-			block.Oui, err = parseMAC(addr)
-			block.Mask = 24 // len(block.Oui) * 8
+			if oui, err = parseMAC(addr); err != nil {
+				continue
+			}
+			mask = (len(addr) + 1) / 3 * 8
 		} else {
-			var mask int
-			block.Oui, err = parseMAC(addr[:i])
-			mask, err = strconv.Atoi(addr[i+1:])
-			block.Mask = uint8(mask)
+			if oui, err = parseMAC(addr[:i]); err != nil {
+				continue
+			}
+			if mask, err = strconv.Atoi(addr[i+1:]); err != nil {
+				continue
+			}
 		}
 
-		if err != nil {
-			continue
-		}
+		var orgbytes [8]byte
+		copy(orgbytes[:], org)
 
-		m.blocks = append(m.blocks, block)
+		if mask > 24 {
+			block := addressBlock48{oui,uint8(mask),orgbytes}
+			m.blocks48 = append(m.blocks48, block)
+		} else {
+			var o [3]byte
+			o[0] = oui[0]
+			o[1] = oui[1]
+			o[2] = oui[2]
+			block := addressBlock24{o, uint8(mask),orgbytes}
+			m.blocks24 = append(m.blocks24, block)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -136,14 +164,23 @@ func New(file string) *OuiDB {
 	return db
 }
 
-func (m *OuiDB) blockLookup(address [6]byte) *addressBlock {
+func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
 	a := macToUint64(address)
-	for _, block := range m.blocks {
-		o := macToUint64(block.Oui)
-		m := maskToUint64(block.Mask)
+	for _, block := range db.blocks48 {
+		o := block.Uint64OUI()
+		m := maskToUint64(block.mask)
 
 		if a&m == o {
-			return &block
+			return addressBlock(&block)
+		}
+	}
+
+	m := ^(uint64(1)<<24-1)
+	for _, block := range db.blocks24 {
+		o := block.Uint64OUI()
+
+		if a&m == o {
+			return addressBlock(&block)
 		}
 	}
 
@@ -160,5 +197,5 @@ func (m *OuiDB) Lookup(s string) (string, error) {
 	if block == nil {
 		return "<unknown>", nil
 	}
-	return block.Organization, nil
+	return block.Organization(), nil
 }

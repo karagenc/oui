@@ -53,11 +53,11 @@ func TestInvalidDBFile(t *testing.T) {
 }
 
 func TestLookup24(t *testing.T) {
-	lookup(t, "60:03:08:a0:ec:a6", "Apple, Inc.")
+	lookup(t, "60:03:08:a0:ec:a6", "Apple")
 }
 
 func TestLookup36(t *testing.T) {
-	lookup(t, "00:1B:C5:00:E1:55", "Vigor Electric Corp")
+	lookup(t, "00:1B:C5:00:E1:55", "VigorEle")
 }
 
 func TestLookup40(t *testing.T) {
@@ -65,11 +65,11 @@ func TestLookup40(t *testing.T) {
 }
 
 func TestFormatSingleZero(t *testing.T) {
-	lookup(t, "0:25:9c:42:0:62", "Cisco-Linksys, LLC")
+	lookup(t, "0:25:9c:42:0:62", "Cisco-Li")
 }
 
 func TestFormatUppercase(t *testing.T) {
-	lookup(t, "0:25:9C:42:C2:62", "Cisco-Linksys, LLC")
+	lookup(t, "0:25:9C:42:C2:62", "Cisco-Li")
 }
 
 func TestInvalidMAC1(t *testing.T) {
