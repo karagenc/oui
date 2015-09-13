@@ -37,11 +37,8 @@ func parseMAC(s string) ([6]byte, error) {
 		oct = strings.Split(s, ":")
 	}
 
-	/*oct := strings.FieldsFunc(s,
-		func(r rune) bool { return r == ':' || r == '-' })*/
-
-	for i,x := range(oct) {
-		h,err := strconv.ParseUint(x, 16, 8)
+	for i, x := range oct {
+		h, err := strconv.ParseUint(x, 16, 8)
 		if err != nil {
 			return hw, err
 		}
@@ -64,7 +61,7 @@ type addressBlock24 struct {
 }
 
 func (a *addressBlock24) Uint64OUI() uint64 {
-	return uint64(a.oui[0]) << 40 | uint64(a.oui[1]) << 32 | uint64(a.oui[2]) << 24
+	return uint64(a.oui[0])<<40 | uint64(a.oui[1])<<32 | uint64(a.oui[2])<<24
 }
 
 func (a *addressBlock24) Organization() string {
@@ -136,14 +133,14 @@ func (m *OuiDB) load(path string) error {
 		copy(orgbytes[:], org)
 
 		if mask > 24 {
-			block := addressBlock48{oui,uint8(mask),orgbytes}
+			block := addressBlock48{oui, uint8(mask), orgbytes}
 			m.blocks48 = append(m.blocks48, block)
 		} else {
 			var o [3]byte
 			o[0] = oui[0]
 			o[1] = oui[1]
 			o[2] = oui[2]
-			block := addressBlock24{o, uint8(mask),orgbytes}
+			block := addressBlock24{o, uint8(mask), orgbytes}
 			m.blocks24 = append(m.blocks24, block)
 		}
 	}
@@ -175,7 +172,7 @@ func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
 		}
 	}
 
-	m := ^(uint64(1)<<24-1)
+	m := ^(uint64(1)<<24 - 1)
 	for _, block := range db.blocks24 {
 		o := block.Uint64OUI()
 
@@ -195,7 +192,7 @@ func (m *OuiDB) Lookup(s string) (string, error) {
 	}
 	block := m.blockLookup(addr)
 	if block == nil {
-		return "<unknown>", nil
+		return "", nil
 	}
 	return block.Organization(), nil
 }
