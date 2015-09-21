@@ -8,20 +8,20 @@ Golang tools to work with Mac addresses and oui. Includes oui database to resolv
 package main
 
 import (
-  "fmt"
+	"fmt"
 	"github.com/dutchcoders/go-ouitools"
 )
 
-var db *OuiDb
+var db *OuiDB
 
 func main() {
-	db := New("oui.txt")
+	db := ouidb.New("oui.txt")
 	if db == nil {
 		t.Fatal("database not initialized")
 	}
   
-  mac:="00:16:e0:3d:f4:4c"
-	v, err := db.VendorLookup(mac)
+	mac:="00:16:e0:3d:f4:4c"
+	v, err := db.Lookup(mac)
 	if err != nil {
 		fmt.Fatalf("parse: %s: %s", mac, err.Error())
 	}
