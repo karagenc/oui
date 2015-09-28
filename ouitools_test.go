@@ -20,7 +20,7 @@ func lookup(t *testing.T, mac, org string) {
 	if v != org {
 		t.Fatalf("lookup: input %s, expect %q, got %q", mac, org, v)
 	}
-	t.Logf("%s => %s\n", mac, v)
+	//t.Logf("%s => %s\n", mac, v)
 }
 
 func string48(b [6]byte) string {
