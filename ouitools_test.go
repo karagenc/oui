@@ -75,6 +75,10 @@ func TestLookup40(t *testing.T) {
 	lookup(t, "20-52-45-43-56-aa", "Receive")
 }
 
+func TestLookupUnknown(t *testing.T) {
+	lookup(t, "ff:ff:00:a0:ec:a6", "")
+}
+
 func TestFormatSingleZero(t *testing.T) {
 	lookup(t, "0:25:9c:42:0:62", "Cisco-Li")
 }

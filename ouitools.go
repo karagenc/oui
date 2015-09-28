@@ -182,15 +182,21 @@ func (m *OuiDB) load(path string) error {
 			continue
 		}
 
-		// Split input text into address and organization name
-		fields := fieldsRe.FindAllStringSubmatch(text, -1)
-
-		if fields[0][2] == "IeeeRegi" {
+		// Skip token ring entries
+		if strings.Contains(text, "[TR?]") {
 			continue
 		}
 
+		// Split input text into address and organization name
+		fields := fieldsRe.FindAllStringSubmatch(text, -1)
+
 		addr := fields[0][1]
 		org := fields[0][2] + "        "
+
+		switch org[:8] {
+		case "IeeeRegi", "Spanning":
+			continue
+		}
 
 		var oui [6]byte
 		var mask int
@@ -248,11 +254,11 @@ func New(file string) *OuiDB {
 func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
 	a := macToUint64(address)
 
-	if b := db.blocks48.Search(a, 0, len(db.blocks48)); b != nil {
+	if b := db.blocks48.Search(a, 0, len(db.blocks48)-1); b != nil {
 		return b
 	}
 
-	return db.blocks24.Search(a, 0, len(db.blocks24))
+	return db.blocks24.Search(a, 0, len(db.blocks24)-1)
 }
 
 // Lookup obtains the vendor organization name from the MAC address s.
