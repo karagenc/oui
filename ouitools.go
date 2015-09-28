@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -50,6 +51,7 @@ func parseMAC(s string) ([6]byte, error) {
 
 type addressBlock interface {
 	Uint64OUI() uint64
+	Uint64Mask() uint64
 	Organization() string
 }
 
@@ -64,8 +66,47 @@ func (a *addressBlock24) Uint64OUI() uint64 {
 	return uint64(a.oui[0])<<40 | uint64(a.oui[1])<<32 | uint64(a.oui[2])<<24
 }
 
+func (a *addressBlock24) Uint64Mask() uint64 {
+	return ^(uint64(1)<<24 - 1)
+}
+
 func (a *addressBlock24) Organization() string {
 	return strings.TrimSpace(string(a.organization[:]))
+}
+
+type addressBlocks24 []addressBlock24
+
+func (bs addressBlocks24) Len() int {
+	return len(bs)
+}
+
+func (bs addressBlocks24) Less(i, j int) bool {
+	return bs[i].Uint64OUI() < bs[j].Uint64OUI()
+}
+
+func (bs addressBlocks24) Swap(i, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
+}
+
+func (bs addressBlocks24) Search(addr uint64, i, j int) addressBlock {
+
+	k := (i + j) / 2
+	o := bs[k].Uint64OUI()
+	m := bs[k].Uint64Mask()
+
+	if addr&m == o {
+		return addressBlock(&bs[k])
+	}
+
+	if i == j {
+		return nil
+	}
+
+	if addr&m < o {
+		return bs.Search(addr, i, k)
+	} else {
+		return bs.Search(addr, k+1, j)
+	}
 }
 
 type addressBlock48 struct {
@@ -78,13 +119,52 @@ func (a *addressBlock48) Uint64OUI() uint64 {
 	return macToUint64(a.oui)
 }
 
+func (a *addressBlock48) Uint64Mask() uint64 {
+	return maskToUint64(a.mask)
+}
+
 func (a *addressBlock48) Organization() string {
 	return strings.TrimSpace(string(a.organization[:]))
 }
 
+type addressBlocks48 []addressBlock48
+
+func (bs addressBlocks48) Len() int {
+	return len(bs)
+}
+
+func (bs addressBlocks48) Less(i, j int) bool {
+	return bs[i].Uint64OUI() < bs[j].Uint64OUI()
+}
+
+func (bs addressBlocks48) Swap(i, j int) {
+	bs[i], bs[j] = bs[j], bs[i]
+}
+
+func (bs addressBlocks48) Search(addr uint64, i, j int) addressBlock {
+
+	k := (i + j) / 2
+	o := bs[k].Uint64OUI()
+	m := bs[k].Uint64Mask()
+
+	if addr&m == o {
+		return addressBlock(&bs[k])
+	}
+
+	if i == j {
+		return nil
+	}
+
+	if addr&m < o {
+		return bs.Search(addr, i, k)
+	} else {
+		return bs.Search(addr, k+1, j)
+	}
+}
+
 type OuiDB struct {
-	blocks24 []addressBlock24
-	blocks48 []addressBlock48
+	blocks24 addressBlocks24
+	blocks48 addressBlocks48
 }
 
 func (m *OuiDB) load(path string) error {
@@ -158,30 +238,21 @@ func New(file string) *OuiDB {
 	if err := db.load(file); err != nil {
 		return nil
 	}
+
+	sort.Sort(db.blocks48)
+	sort.Sort(db.blocks24)
+
 	return db
 }
 
 func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
 	a := macToUint64(address)
-	for _, block := range db.blocks48 {
-		o := block.Uint64OUI()
-		m := maskToUint64(block.mask)
 
-		if a&m == o {
-			return addressBlock(&block)
-		}
+	if b := db.blocks48.Search(a, 0, len(db.blocks48)); b != nil {
+		return b
 	}
 
-	m := ^(uint64(1)<<24 - 1)
-	for _, block := range db.blocks24 {
-		o := block.Uint64OUI()
-
-		if a&m == o {
-			return addressBlock(&block)
-		}
-	}
-
-	return nil
+	return db.blocks24.Search(a, 0, len(db.blocks24))
 }
 
 // Lookup obtains the vendor organization name from the MAC address s.
