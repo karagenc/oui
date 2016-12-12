@@ -11,11 +11,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/dutchcoders/go-ouitools"
+	"github.com/davidbb/ouidb"
+)
+
+var (
+    db *ouidb.OuiDB
 )
 
 func main() {
-	db := ouidb.New("oui.txt")
+	db = ouidb.New("oui.txt")
 	if db == nil {
 		fmt.Println("database not initialized")
 		os.Exit(1)
@@ -44,3 +48,5 @@ go test
 ## Contributors
 * Remco Verhoef (Dutchcoders) @remco_verhoef
 * Claudio Matsuoka
+* David Barrera
+
