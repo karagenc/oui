@@ -189,7 +189,10 @@ func (m *OuiDB) load(path string) error {
 
 		// Split input text into address and organization name
 		fields := fieldsRe.FindAllStringSubmatch(text, -1)
-
+		// incorrectly formated database might not create fields, which would prevent the line from being parsed
+		if fields == nil {
+			continue
+		}
 		addr := fields[0][1]
 		org := fields[0][2] + "        "
 
