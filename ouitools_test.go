@@ -43,23 +43,24 @@ func invalid(t *testing.T, mac string) {
 }
 
 func TestInitialization(t *testing.T) {
-	db = New("oui.txt")
-	if db == nil {
-		t.Fatal("can't load database file oui.txt")
+	var err error
+	db, err = New("oui.txt")
+	if err != nil {
+		t.Fatalf("can't load database file oui.txt: %s", err)
 	}
 }
 
 func TestMissingDBFile(t *testing.T) {
-	db := New("bad-file")
-	if db != nil {
-		t.Fatal("didn't return nil on missing file")
+	_, err := New("bad-file")
+	if err == nil {
+		t.Fatal("didn't return err on missing file")
 	}
 }
 
 func TestInvalidDBFile(t *testing.T) {
-	db := New("ouidb_test.go")
-	if db != nil {
-		t.Fatal("didn't return nil on bad file")
+	_, err := New("ouidb_test.go")
+	if err == nil {
+		t.Fatal("didn't return err on bad file")
 	}
 }
 

@@ -4,12 +4,15 @@ package ouidb
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 )
+
+const ouiReStr = `^(\S+)\t+(\S+)(\s+#\s+(\S.*))?`
 
 var ErrInvalidMACAddress = errors.New("invalid MAC address")
 
@@ -172,8 +175,9 @@ func (m *OuiDB) load(path string) error {
 	if err != nil {
 		return (err)
 	}
+	defer file.Close()
 
-	fieldsRe := regexp.MustCompile(`^(\S+)\t+(\S+)(\s+#\s+(\S.*))?`)
+	fieldsRe := regexp.MustCompile(ouiReStr)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -238,20 +242,24 @@ func (m *OuiDB) load(path string) error {
 		return err
 	}
 
+	if len(m.blocks48) == 0 && len(m.blocks24) == 0 {
+		return fmt.Errorf("database is empty")
+	}
+
 	return nil
 }
 
 // New returns a new OUI database loaded from the specified file.
-func New(file string) *OuiDB {
+func New(file string) (*OuiDB, error) {
 	db := &OuiDB{}
 	if err := db.load(file); err != nil {
-		return nil
+		return nil, err
 	}
 
 	sort.Sort(db.blocks48)
 	sort.Sort(db.blocks24)
 
-	return db
+	return db, nil
 }
 
 func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
