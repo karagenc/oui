@@ -3,8 +3,10 @@ package ouidb
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"sort"
@@ -170,13 +172,7 @@ type OuiDB struct {
 	blocks48 addressBlocks48
 }
 
-func (m *OuiDB) load(path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return (err)
-	}
-	defer file.Close()
-
+func (m *OuiDB) load(file io.Reader) (err error) {
 	fieldsRe := regexp.MustCompile(ouiReStr)
 
 	scanner := bufio.NewScanner(file)
@@ -249,10 +245,20 @@ func (m *OuiDB) load(path string) error {
 	return nil
 }
 
-// New returns a new OUI database loaded from the specified file.
-func New(file string) (*OuiDB, error) {
-	db := &OuiDB{}
-	if err := db.load(file); err != nil {
+// New returns a new OUI database loaded from the data.
+func New(data []byte) (*OuiDB, error) {
+	buf := bytes.NewBuffer(data)
+	return newFromReader(buf)
+}
+
+// NewFromReader returns a new OUI database loaded from the reader.
+func NewFromReader(r io.Reader) (*OuiDB, error) {
+	return newFromReader(r)
+}
+
+func newFromReader(r io.Reader) (*OuiDB, error) {
+	db := new(OuiDB)
+	if err := db.load(r); err != nil {
 		return nil, err
 	}
 
@@ -260,6 +266,17 @@ func New(file string) (*OuiDB, error) {
 	sort.Sort(db.blocks24)
 
 	return db, nil
+}
+
+// NewFromFile returns a new OUI database loaded from the specified file.
+func NewFromFile(path string) (*OuiDB, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return newFromReader(file)
 }
 
 func (db *OuiDB) blockLookup(address [6]byte) addressBlock {

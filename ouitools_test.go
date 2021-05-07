@@ -3,7 +3,9 @@ package ouidb
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"testing"
 )
 
@@ -44,21 +46,42 @@ func invalid(t *testing.T, mac string) {
 
 func TestInitialization(t *testing.T) {
 	var err error
-	db, err = New("oui.txt")
+	db, err = NewFromFile("oui.txt")
+	if err != nil {
+		t.Fatalf("can't load database file oui.txt: %s", err)
+	}
+
+	file, err := os.Open("oui.txt")
+	if err != nil {
+		t.Fatalf("can't open database file oui.txt: %s", err)
+	}
+	defer file.Close()
+
+	db, err = NewFromReader(file)
+	if err != nil {
+		t.Fatalf("can't load database file oui.txt: %s", err)
+	}
+
+	data, err := ioutil.ReadFile("oui.txt")
+	if err != nil {
+		t.Fatalf("can't read database file oui.txt: %s", err)
+	}
+
+	db, err = New(data)
 	if err != nil {
 		t.Fatalf("can't load database file oui.txt: %s", err)
 	}
 }
 
 func TestMissingDBFile(t *testing.T) {
-	_, err := New("bad-file")
+	_, err := NewFromFile("bad-file")
 	if err == nil {
 		t.Fatal("didn't return err on missing file")
 	}
 }
 
 func TestInvalidDBFile(t *testing.T) {
-	_, err := New("ouidb_test.go")
+	_, err := NewFromFile("ouidb_test.go")
 	if err == nil {
 		t.Fatal("didn't return err on bad file")
 	}
