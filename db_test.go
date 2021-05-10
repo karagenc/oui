@@ -1,15 +1,13 @@
-// Package go-oui provides functions to work with MAC and OUI's
-package ouidb
+package oui
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
 )
 
-var db *OuiDB
+var db *DB
 
 func lookup(t *testing.T, mac, org string) {
 	if db == nil {
@@ -46,7 +44,7 @@ func invalid(t *testing.T, mac string) {
 
 func TestInitialization(t *testing.T) {
 	var err error
-	db, err = NewFromFile("oui.txt")
+	db, err = NewDBFromFile("oui.txt")
 	if err != nil {
 		t.Fatalf("can't load database file oui.txt: %s", err)
 	}
@@ -57,31 +55,31 @@ func TestInitialization(t *testing.T) {
 	}
 	defer file.Close()
 
-	db, err = NewFromReader(file)
+	db, err = NewDBFromReader(file)
 	if err != nil {
 		t.Fatalf("can't load database file oui.txt: %s", err)
 	}
 
-	data, err := ioutil.ReadFile("oui.txt")
+	data, err := os.ReadFile("oui.txt")
 	if err != nil {
 		t.Fatalf("can't read database file oui.txt: %s", err)
 	}
 
-	db, err = New(data)
+	db, err = NewDB(data)
 	if err != nil {
 		t.Fatalf("can't load database file oui.txt: %s", err)
 	}
 }
 
 func TestMissingDBFile(t *testing.T) {
-	_, err := NewFromFile("bad-file")
+	_, err := NewDBFromFile("bad-file")
 	if err == nil {
 		t.Fatal("didn't return err on missing file")
 	}
 }
 
 func TestInvalidDBFile(t *testing.T) {
-	_, err := NewFromFile("ouidb_test.go")
+	_, err := NewDBFromFile("ouidb_test.go")
 	if err == nil {
 		t.Fatal("didn't return err on bad file")
 	}

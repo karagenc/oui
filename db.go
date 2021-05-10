@@ -1,5 +1,5 @@
-// Package go-oui provides functions to work with MAC and OUI's
-package ouidb
+// Package oui provides functions to work with MAC and OUI's
+package oui
 
 import (
 	"bufio"
@@ -167,12 +167,12 @@ func (bs addressBlocks48) Search(addr uint64, i, j int) addressBlock {
 	}
 }
 
-type OuiDB struct {
+type DB struct {
 	blocks24 addressBlocks24
 	blocks48 addressBlocks48
 }
 
-func (m *OuiDB) load(file io.Reader) (err error) {
+func (db *DB) load(file io.Reader) (err error) {
 	fieldsRe := regexp.MustCompile(ouiReStr)
 
 	scanner := bufio.NewScanner(file)
@@ -223,14 +223,14 @@ func (m *OuiDB) load(file io.Reader) (err error) {
 
 		if mask > 24 {
 			block := addressBlock48{oui, uint8(mask), orgbytes}
-			m.blocks48 = append(m.blocks48, block)
+			db.blocks48 = append(db.blocks48, block)
 		} else {
 			var o [3]byte
 			o[0] = oui[0]
 			o[1] = oui[1]
 			o[2] = oui[2]
 			block := addressBlock24{o, uint8(mask), orgbytes}
-			m.blocks24 = append(m.blocks24, block)
+			db.blocks24 = append(db.blocks24, block)
 		}
 	}
 
@@ -238,7 +238,7 @@ func (m *OuiDB) load(file io.Reader) (err error) {
 		return err
 	}
 
-	if len(m.blocks48) == 0 && len(m.blocks24) == 0 {
+	if len(db.blocks48) == 0 && len(db.blocks24) == 0 {
 		return fmt.Errorf("database is empty")
 	}
 
@@ -246,18 +246,18 @@ func (m *OuiDB) load(file io.Reader) (err error) {
 }
 
 // New returns a new OUI database loaded from the data.
-func New(data []byte) (*OuiDB, error) {
+func NewDB(data []byte) (*DB, error) {
 	buf := bytes.NewBuffer(data)
-	return newFromReader(buf)
+	return newDBFromReader(buf)
 }
 
 // NewFromReader returns a new OUI database loaded from the reader.
-func NewFromReader(r io.Reader) (*OuiDB, error) {
-	return newFromReader(r)
+func NewDBFromReader(r io.Reader) (*DB, error) {
+	return newDBFromReader(r)
 }
 
-func newFromReader(r io.Reader) (*OuiDB, error) {
-	db := new(OuiDB)
+func newDBFromReader(r io.Reader) (*DB, error) {
+	db := new(DB)
 	if err := db.load(r); err != nil {
 		return nil, err
 	}
@@ -269,17 +269,17 @@ func newFromReader(r io.Reader) (*OuiDB, error) {
 }
 
 // NewFromFile returns a new OUI database loaded from the specified file.
-func NewFromFile(path string) (*OuiDB, error) {
+func NewDBFromFile(path string) (*DB, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	return newFromReader(file)
+	return newDBFromReader(file)
 }
 
-func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
+func (db *DB) blockLookup(address [6]byte) addressBlock {
 	a := macToUint64(address)
 
 	if b := db.blocks48.Search(a, 0, len(db.blocks48)-1); b != nil {
@@ -290,12 +290,12 @@ func (db *OuiDB) blockLookup(address [6]byte) addressBlock {
 }
 
 // Lookup obtains the vendor organization name from the MAC address s.
-func (m *OuiDB) Lookup(s string) (string, error) {
+func (db *DB) Lookup(s string) (string, error) {
 	addr, err := parseMAC(s)
 	if err != nil {
 		return "", err
 	}
-	block := m.blockLookup(addr)
+	block := db.blockLookup(addr)
 	if block == nil {
 		return "", nil
 	}
