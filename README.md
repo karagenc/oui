@@ -4,7 +4,7 @@ This is a fork of the fork of the fork the fork of [go-ouitools](https://github.
 
 ## Example
 
-```
+```go
 package main
 
 import (
@@ -16,6 +16,7 @@ import (
 
 func main() {
 	// You may also use NewDB and NewDBFromReader functions.
+	// Or use the ouidata.NewDB function to load the embedded DB.
 	db, err := oui.NewDBFromFile("oui.txt")
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -35,13 +36,21 @@ func main() {
 
 ## Testing
 
-```
+```bash
 go test
+```
+
+## Update Embedded OUI DB
+
+```bash
+wget -O oui.txt https://gitlab.com/wireshark/wireshark/-/raw/master/manuf
 ```
 
 ## References
 
-* Wireshark OUI database
+* Wireshark OUI database (aka Wireshark manufacturer database)
+  * See https://www.wireshark.org/tools/oui-lookup.html
+  * See https://gitlab.com/wireshark/wireshark/-/raw/master/manuf
 
 ## Contributors
 
