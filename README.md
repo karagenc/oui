@@ -44,6 +44,7 @@ go test
 
 ```bash
 wget -O oui.txt https://gitlab.com/wireshark/wireshark/-/raw/master/manuf
+gzip -9 oui.txt --stdout >ouidata/oui.txt.gz
 ```
 
 ## References
