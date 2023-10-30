@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-const ouiReStr = `^(\S+)\t+(\S+)(\s+#\s+(\S.*))?`
+const ouiReStr = `^(\S+)\s*\t+(\S+)(\s+#\s+(\S.*))?`
 
 var ErrInvalidMACAddress = errors.New("invalid MAC address")
 
