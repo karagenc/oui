@@ -1,3 +1,3 @@
-module github.com/tomruk/oui
+module github.com/karagenc/oui
 
 go 1.16

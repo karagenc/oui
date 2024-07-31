@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tomruk/oui"
+	"github.com/karagenc/oui"
 )
 
 func main() {
